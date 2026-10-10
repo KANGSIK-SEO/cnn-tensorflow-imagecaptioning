@@ -1,0 +1,7 @@
+# 학습용 원본·중간 파일 (다시 만들 수 있다: python training/prepare_data.py)
+training/data/
+training/work/
+training/work.log
+training/node_modules/
+__pycache__/
+.DS_Store

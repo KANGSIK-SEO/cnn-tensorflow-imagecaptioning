@@ -1,0 +1,14 @@
+{
+  "name": "cnn-tensorflow-imagecaptioning-training",
+  "private": true,
+  "type": "module",
+  "description": "TensorFlow.js로 CNN(작가 판별·원본 대조)과 이미지 캡셔닝을 학습한다. 네이티브 DLL 없이 WebAssembly로 돈다.",
+  "scripts": {
+    "train": "node train.mjs"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "jpeg-js": "0.4.4"
+  }
+}

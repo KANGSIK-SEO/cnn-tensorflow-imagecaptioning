@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>명화 진위 참고 검사</title>
+  <meta name="description" content="CNN과 이미지 캡셔닝으로 그림 사진을 스마트폰 안에서 분석합니다. API 키도 서버도 필요 없습니다.">
+  <meta name="theme-color" content="#1f2a44">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/tf.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>명화 진위 참고 검사</h1>
+    <p class="sub">사진을 넣으면 <b>이 폰 안에서</b> CNN이 화풍과 미술관 소장품을 대조하고, 이미지 캡셔닝이 그림을 설명합니다.
+      사진은 어디로도 보내지 않습니다.</p>
+  </header>
+
+  <main>
+    <section class="card" id="input-card">
+      <label class="pick" for="photo">
+        <span class="pick-icon" aria-hidden="true">📷</span>
+        <span>그림 사진 찍기 · 고르기</span>
+      </label>
+      <input id="photo" type="file" accept="image/*" hidden>
+      <label class="claim">판매자가 말한 작가 (선택)
+        <select id="claimed"><option value="">모름 / 목록에 없음</option></select>
+      </label>
+      <div id="preview-wrap" hidden><img id="preview" alt="고른 그림"></div>
+      <p id="status" role="status" aria-live="polite">모델을 불러오는 중…</p>
+    </section>
+
+    <section class="card" id="result" hidden aria-live="polite">
+      <h2>1. 미술관 소장품 대조 <small>CNN 임베딩</small></h2>
+      <p id="match-verdict" class="verdict"></p>
+      <ol id="matches" class="matches"></ol>
+
+      <h2>2. 화풍으로 본 작가 <small>CNN 분류</small></h2>
+      <p id="artist-verdict" class="verdict"></p>
+      <ol id="artists" class="bars"></ol>
+
+      <h2>3. 그림 설명 <small>이미지 캡셔닝</small></h2>
+      <p id="caption" class="caption"></p>
+      <p id="caption-tokens" class="muted"></p>
+
+      <p class="notice">이 결과는 <b>참고용</b>이며 감정서가 아닙니다. 그림을 실제로 사고팔 때는 전문 감정기관에 맡기세요.</p>
+    </section>
+
+    <section class="card muted-card">
+      <h2>어떻게 동작하나요</h2>
+      <ul>
+        <li><b>CNN</b>: MobileNetV2(ImageNet 사전학습)를 전이학습해 작가 15명의 화풍을 구분하고, 그림의 특징 벡터로 미술관 소장품
+          <span id="ref-count">약 3,500</span>점과 비교합니다. 미술관에 있는 원작과 똑같은 그림이 "진품"으로 팔린다면, 그 원작 사진을 복제했을 가능성이 큽니다.</li>
+        <li><b>이미지 캡셔닝</b>: CNN 특징을 GRU 디코더에 넣어 시대·문화권·기법·주제를 한 단어씩 만들어 냅니다.</li>
+        <li><b>기기 안 추론</b>: TensorFlow.js로 이 폰 안에서 돌아갑니다. API 키·서버가 필요 없고, 처음 열 때 앱과 모델(약 12MB)을 폰에 저장해 두므로
+          그다음부터는 <b>인터넷 없이(비행기 모드에서도)</b> 됩니다. 홈 화면에 추가하면 앱처럼 쓸 수 있습니다.</li>
+        <li><b>학습 데이터</b>: 메트로폴리탄·시카고·클리블랜드 미술관의 퍼블릭 도메인(CC0) 그림.</li>
+      </ul>
+      <p id="metrics" class="muted"></p>
+    </section>
+  </main>
+
+  <footer>
+    <a href="https://github.com/KANGSIK-SEO/cnn-tensorflow-imagecaptioning">소스 코드</a> ·
+    <span id="offline-state">오프라인 준비 중…</span>
+  </footer>
+</body>
+</html>
