@@ -74,8 +74,18 @@ def tradition(origin: str, department: str, subjects: str) -> str:
                     ("america", "미국"), ("united states", "미국")):
         if key in text:
             return ko
-    if any(k in text for k in ("europe", "french", "france", "italian", "italy", "dutch", "flemish",
-                                "british", "german", "spanish", "netherland")):
+    # 유럽은 나라까지 나눈다 — "르네상스 이탈리아 그림을 18세기 유럽이라 부르는" 식의 뭉뚱그림을 줄인다 (2026-10-11 피드백)
+    for keys, ko in ((("italian", "italy", "florence", "florentine", "venice", "venetian", "siena", "sienese", "rome", "bologna",
+                       "milan", "naples", "genoa", "ferrara"), "이탈리아"),
+                     (("flemish", "flanders", "antwerp", "brussels", "bruges"), "플랑드르"),
+                     (("dutch", "netherland", "holland", "haarlem", "amsterdam", "utrecht", "leiden", "delft"), "네덜란드"),
+                     (("spanish", "spain", "seville", "madrid"), "스페인"),
+                     (("french", "france", "paris"), "프랑스"),
+                     (("british", "english", "england", "scottish", "london"), "영국"),
+                     (("german", "germany", "austrian", "austria", "swiss"), "독일어권")):
+        if any(k in text for k in keys):
+            return ko
+    if "europe" in text:
         return "유럽"
     return "기타"
 
@@ -173,6 +183,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--art-db", required=True)
     ap.add_argument("--captions", type=int, default=3000, help="캡션 학습에 더 쓸 그림 수 (작가 그림 외)")
+    ap.add_argument("--old-masters", action="store_true",
+                    help="1300~1699년 유럽 회화를 모두 더한다 (르네상스·매너리즘·바로크 — 캡션 시대 판정과 소장품 대조 보강)")
     ap.add_argument("--seed", type=int, default=7)
     args = ap.parse_args()
 
@@ -186,6 +198,13 @@ def main() -> None:
         f"SELECT * FROM artworks WHERE {painting} AND artist NOT IN ({','.join('?' * len(ARTISTS))})", ARTISTS)]
     random.Random(args.seed).shuffle(others)
     rows = artist_rows + others[:args.captions]
+    if args.old_masters:
+        have = {r["id"] for r in rows}
+        old = [r for r in others[args.captions:] if r["id"] not in have and r["year_start"] and 1300 <= int(r["year_start"]) <= 1699
+               and tradition(r["origin"] or "", r["department"] or "", r["subjects"] or "") not in
+               ("한국", "일본", "중국", "인도", "페르시아", "미국", "기타")]
+        print(f"옛 거장(1300~1699 유럽) 회화 {len(old)}점 추가")
+        rows += old
 
     IMAGES.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(16) as pool:

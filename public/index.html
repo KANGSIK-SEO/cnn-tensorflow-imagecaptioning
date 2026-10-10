@@ -73,7 +73,23 @@
       <input id="photo" class="visually-hidden" type="file" accept="image/*" aria-label="그림 사진 고르기 · Choose a painting photo">
       <p class="hint">그림이 화면에 꽉 차게, 정면에서, 반사광 없이 찍으면 더 정확해요. · Fill the frame, shoot straight on, avoid glare.</p>
 
-      <div id="preview-wrap" hidden><img id="preview" alt="고른 그림 · Selected painting"></div>
+      <div id="crop" class="crop" hidden>
+        <p class="crop-help">
+          네모를 끌어서 <b>그림 부분만</b> 남겨 주세요. 액자·벽이 들어가면 결과가 흐려져요.
+          <span class="en" lang="en">Drag the box so it covers <b>only the painting</b> — frames and walls blur the result.</span>
+        </p>
+        <div class="crop-stage" id="crop-stage">
+          <img id="crop-img" alt="고른 사진 · Selected photo" draggable="false">
+          <div id="crop-box" class="crop-box" role="group" aria-label="분석할 영역 · Area to analyze">
+            <span class="handle nw" data-h="nw"></span><span class="handle ne" data-h="ne"></span>
+            <span class="handle sw" data-h="sw"></span><span class="handle se" data-h="se"></span>
+          </div>
+        </div>
+        <div class="crop-actions">
+          <button id="analyze-btn" class="btn primary" type="button">이 영역 분석 · Analyze this area</button>
+          <button id="whole-btn" class="btn" type="button">사진 전체 · Whole photo</button>
+        </div>
+      </div>
 
       <div id="status" class="status info" role="status" aria-live="polite">
         <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -96,6 +112,8 @@
     <section class="card" id="result" hidden aria-labelledby="result-title" aria-live="polite">
       <h2 id="result-title" class="visually-hidden">분석 결과 · Results</h2>
       <p class="muted when"><time id="analyzed-at"></time></p>
+      <div class="analyzed"><img id="analyzed-img" alt="분석한 영역 · Analyzed area"></div>
+      <p id="scope-verdict" class="scope" hidden></p>
 
       <h3>1. 미술관 소장품 대조 <small>CNN embedding</small><span class="en" lang="en">Museum collection match</span></h3>
       <p id="match-verdict" class="verdict"></p>

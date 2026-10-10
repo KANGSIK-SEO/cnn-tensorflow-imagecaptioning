@@ -77,31 +77,40 @@ const items = meta.items.filter((it) => fs.existsSync(path.join(DATA, "views", `
 const N = items.length;
 console.log(`그림 ${N}점, 보기 ${N * VIEWS}장`);
 
-fs.mkdirSync(WORK, { recursive: true });
-const cacheFile = path.join(WORK, `features_${N}.f32`);
-let feats; // [N*VIEWS, FEAT], 행 = i*VIEWS + k
-if (fs.existsSync(cacheFile)) {
-  const b = fs.readFileSync(cacheFile);
-  feats = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
-} else {
+// 특징은 그림마다 work/feats/<id>.f32 (보기 4개 × 1280)에 저장해 두고, 그림을 더하면 새 그림만 계산한다
+const FEAT_DIR = path.join(WORK, "feats");
+fs.mkdirSync(FEAT_DIR, { recursive: true });
+const featPath = (id) => path.join(FEAT_DIR, `${id}.f32`);
+const feats = new Float32Array(N * VIEWS * FEAT); // 행 = i*VIEWS + k
+const todo = [];
+items.forEach((it, i) => {
+  if (fs.existsSync(featPath(it.id))) {
+    const b = fs.readFileSync(featPath(it.id));
+    feats.set(new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4), i * VIEWS * FEAT);
+  } else todo.push(i);
+});
+if (todo.length) {
+  console.log(`새 그림 ${todo.length}점의 특징을 뽑는다`);
   const backbone = await loadGraphFromDir(path.join(OUT, "backbone"));
-  feats = new Float32Array(N * VIEWS * FEAT);
-  const B = 32;
-  const rows = N * VIEWS;
+  const PER = 8; // 그림 8점 = 보기 32장씩
   const started = Date.now();
-  for (let s = 0; s < rows; s += B) {
-    const n = Math.min(B, rows - s);
-    const buf = new Uint8Array(n * IMG * IMG * 3);
-    for (let r = 0; r < n; r++) buf.set(readView(items[Math.floor((s + r) / VIEWS)].id, (s + r) % VIEWS), r * IMG * IMG * 3);
-    const out = tf.tidy(() => backbone.execute(tf.tensor4d(buf, [n, IMG, IMG, 3], "int32").toFloat().div(255)));
-    feats.set(await out.data(), s * FEAT);
+  for (let s = 0; s < todo.length; s += PER) {
+    const chunk = todo.slice(s, s + PER);
+    const buf = new Uint8Array(chunk.length * VIEWS * IMG * IMG * 3);
+    chunk.forEach((i, c) => { for (let k = 0; k < VIEWS; k++) buf.set(readView(items[i].id, k), (c * VIEWS + k) * IMG * IMG * 3); });
+    const out = tf.tidy(() => backbone.execute(tf.tensor4d(buf, [chunk.length * VIEWS, IMG, IMG, 3], "int32").toFloat().div(255)));
+    const data = await out.data();
     out.dispose();
-    if ((s / B) % 25 === 0) {
-      const done = s + n;
-      console.log(`  특징 추출 ${done}/${rows} (남은 시간 약 ${Math.round((Date.now() - started) / done * (rows - done) / 60000)}분)`);
+    chunk.forEach((i, c) => {
+      const part = data.slice(c * VIEWS * FEAT, (c + 1) * VIEWS * FEAT);
+      feats.set(part, i * VIEWS * FEAT);
+      fs.writeFileSync(featPath(items[i].id), Buffer.from(part.buffer));
+    });
+    if ((s / PER) % 25 === 0) {
+      const done = s + chunk.length;
+      console.log(`  특징 추출 ${done}/${todo.length} (남은 시간 약 ${Math.round((Date.now() - started) / done * (todo.length - done) / 60000)}분)`);
     }
   }
-  fs.writeFileSync(cacheFile, Buffer.from(feats.buffer));
 }
 const row = (i, k) => feats.subarray((i * VIEWS + k) * FEAT, (i * VIEWS + k + 1) * FEAT);
 const center = new Float32Array(N * FEAT);
@@ -156,6 +165,36 @@ for (let epoch = 1; epoch <= 80; epoch++) {
 }
 artistHead.setWeights(best.weights);
 console.log(`작가 판별 시험: top-1 ${best.top1.toFixed(3)}, top-3 ${best.top3.toFixed(3)} (시험 그림 ${artTe.length}점, ${best.epoch}번째 학습에서 최고)`);
+
+// 여러 보기 평균(TTA): 그림 전체·좌우 반전·잘라 보기의 확률을 평균하면 구도보다 붓질·질감 쪽을 더 본다
+function meanProbs(indices) {
+  return tf.tidy(() => tf.stack([0, 1, 2, 3].map((k) =>
+    artistHead.predict(tf.tensor2d(gather(indices, [k]), [indices.length, FEAT])))).mean(0).arraySync());
+}
+const tePTta = meanProbs(artTe);
+let ttaTop1 = 0, ttaTop3 = 0;
+tePTta.forEach((probs, r) => {
+  const order = [...probs.keys()].sort((a, b) => probs[b] - probs[a]);
+  ttaTop1 += order[0] === yTe[r];
+  ttaTop3 += order.slice(0, 3).includes(yTe[r]);
+});
+ttaTop1 /= artTe.length; ttaTop3 /= artTe.length;
+console.log(`작가 판별 시험 (보기 4개 평균): top-1 ${ttaTop1.toFixed(3)}, top-3 ${ttaTop3.toFixed(3)}`);
+
+// "모름" 기준값: 15명의 시험 그림(학습 범위 안)과 15명 밖 작가의 그림(학습 범위 밖)에서 최고 확률을 비교해
+// 둘을 가장 잘 가르는 값을 고른다 (양쪽 정답률의 평균이 가장 높은 값)
+const outside = items.map((it, i) => (it.label ? -1 : i)).filter((i) => i >= 0);
+const maxOf = (rows) => rows.map((p) => Math.max(...p));
+const inMax = maxOf(tePTta);
+const outMax = maxOf(meanProbs(outside));
+let calib = { balanced: -1 };
+for (let t = 0.2; t <= 0.95; t += 0.01) {
+  const inKeep = inMax.filter((m) => m >= t).length / inMax.length;
+  const outReject = outMax.filter((m) => m < t).length / outMax.length;
+  if ((inKeep + outReject) / 2 > calib.balanced) calib = { threshold: +t.toFixed(2), inKeep, outReject, balanced: (inKeep + outReject) / 2 };
+}
+console.log(`'모름' 기준: 최고 확률 ${calib.threshold} 미만이면 학습 범위 밖 — 범위 안 그림 ${(calib.inKeep * 100).toFixed(0)}% 통과, ` +
+  `범위 밖 그림 ${(calib.outReject * 100).toFixed(0)}% 걸러냄 (범위 밖 ${outside.length}점)`);
 
 // ---------- 3) 원본 대조 임베딩: PCA 256차원 (부분공간 반복법) ----------
 const [pcaW, pcaB] = tf.tidy(() => {
@@ -306,7 +345,10 @@ fs.writeFileSync(path.join(OUT, "meta.json"), JSON.stringify({
   backbone: "MobileNetV2 1.0 224 (ImageNet), 입력 0~1 RGB",
   artists, artist_ko: meta.artist_ko, vocab,
   metrics: { artist_top1: r3(best.top1), artist_top3: r3(best.top3), artist_test_images: artTe.length,
+    artist_top1_tta: r3(ttaTop1), artist_top3_tta: r3(ttaTop3),
     caption_exact: r3(capExact), caption_slot_accuracy: r3(capSlot), train_images: N },
+  // 작가 최고 확률이 이 값 미만이면 "학습 범위 밖의 그림" — 학습 범위 안 그림 in_keep 비율은 통과, 범위 밖 그림 out_reject 비율은 걸러냄
+  artist_scope: { threshold: calib.threshold, in_keep: r3(calib.inKeep), out_reject: r3(calib.outReject), outside_images: outside.length },
   match_thresholds: thresholds, caption_samples: samples,
 }, null, 1));
 

@@ -10,11 +10,14 @@
 const MODELS = "models";
 const LOAD_BUDGET_MS = 90_000;   // 모델 내려받기 전체 시간 예산 (느린 모바일 망 고려, 저장된 뒤에는 금방 끝난다)
 const FETCH_RETRIES = 1;         // 일시 장애(5xx·연결 끊김)만 한 번 더 — 시간 초과·4xx는 다시 해도 같다 (명화 추천 챗봇 PR #23)
-const CACHE_NAME = "art-verify-v2";
+const CACHE_NAME = "art-verify-v3";
 
 const $ = (id) => document.getElementById(id);
 const state = { meta: null, refs: null, refVecs: null, backbone: null, heads: null, decoder: null,
-  ready: false, busy: false, pendingFile: null, run: 0 };
+  ready: false, busy: false, pending: false, run: 0,
+  img: null, rect: { x: 0, y: 0, w: 1, h: 1 } };   // 고른 사진과 분석할 영역(사진 크기에 대한 비율)
+const DEFAULT_INSET = 0.06;   // 처음 상자는 가장자리를 6%씩 덜어 낸다 (액자·벽이 대개 가장자리에 있다)
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 // ---------- 상태 메시지 (PR #39 공통 컴포넌트) ----------
 const STATUS_KINDS = new Set(["info", "busy", "success", "warning", "error"]);
@@ -127,7 +130,7 @@ async function boot() {
     state.ready = true;
     setStatus("success", "준비됐어요. 그림 사진을 넣어 주세요.", "Ready. Add a photo of a painting.");
     checkOffline();
-    if (state.pendingFile) { const f = state.pendingFile; state.pendingFile = null; analyze(f); }
+    if (state.pending) { state.pending = false; analyze(); }
   } catch (e) {
     console.error(e);
     logStage(run, "load", started, false);
@@ -149,6 +152,8 @@ function fillStaticTexts() {
     `시험 성적 · Test accuracy — 작가 판별 1순위 ${pct(m.artist_top1)}, 3순위 안 ${pct(m.artist_top3)} ` +
     `(학습에 안 쓴 그림 ${m.artist_test_images}점 · top-1 / top-3 on ${m.artist_test_images} held-out paintings), ` +
     `캡션 시대·문화권·기법 ${pct(m.caption_slot_accuracy)} · caption era/culture/technique. ` +
+    (meta.artist_scope ? `학습 범위 밖 판정 — 범위 밖 그림 ${pct(meta.artist_scope.out_reject)}를 걸러내고, 통과한 판정은 ${pct(meta.artist_scope.kept_top1)}가 정답 · ` +
+      `"outside scope" catches ${pct(meta.artist_scope.out_reject)} of unfamiliar paintings; confident answers are ${pct(meta.artist_scope.kept_top1)} correct. ` : "") +
     `실행 장치 · Backend: ${tf.getBackend()}.`;
 }
 
@@ -162,46 +167,76 @@ function loadImage(file) {
   });
 }
 
-// 학습 때와 같게: 그림 전체를 정사각형으로 늘려 224×224, 0~1 RGB
-function toInput(img) {
+// 학습 때와 같게: 고른 영역을 정사각형으로 늘려 224×224, 0~1 RGB.
+// 보기 번호 — 0: 영역 전체, 1: 좌우 반전, 2: 가운데 75% 확대. 어떤 보기를 평균할지는 시험 정확도로 정해
+// meta.inference_views에 적혀 있다 (training/calibrate.mjs). 첫 보기(0)의 결과로 대조·캡션을 한다.
+function toCanvas(img, rect, view) {
   const size = state.meta.image_size;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, 0, 0, size, size);
-  return tf.tidy(() => tf.browser.fromPixels(canvas).toFloat().div(255).expandDims(0));
+  let { x, y, w, h } = rect;
+  if (view === 2) { x += w * 0.125; y += h * 0.125; w *= 0.75; h *= 0.75; }
+  if (view === 1) { ctx.translate(size, 0); ctx.scale(-1, 1); }
+  const W = img.naturalWidth, H = img.naturalHeight;
+  ctx.drawImage(img, x * W, y * H, w * W, h * H, 0, 0, size, size);
+  return canvas;
+}
+function toInputs(img, rect) {
+  const views = state.meta.inference_views || [0];
+  const canvases = views.map((v) => toCanvas(img, rect, v));
+  $("analyzed-img").src = canvases[0].toDataURL("image/jpeg", 0.8);
+  return tf.tidy(() => tf.stack(canvases.map((c) => tf.browser.fromPixels(c))).toFloat().div(255));
 }
 
 // ---------- 분석 ----------
-async function analyze(file) {
+// 사진을 고르면 먼저 분석할 영역을 고르게 한다
+async function choosePhoto(file) {
   const check = Logic.checkFile(file);
   if (!check.ok) { setStatus("warning", check.ko, check.en); return; }
+  try {
+    const img = await loadImage(file);
+    state.img = img;
+    $("crop-img").src = img.src;
+    state.rect = { x: DEFAULT_INSET, y: DEFAULT_INSET, w: 1 - 2 * DEFAULT_INSET, h: 1 - 2 * DEFAULT_INSET };
+    $("crop").hidden = false;
+    $("result").hidden = true;
+    drawCropBox();
+    setStatus(state.ready ? "info" : "busy",
+      "네모를 그림에 맞춘 뒤 '이 영역 분석'을 눌러 주세요.", "Fit the box to the painting, then tap 'Analyze this area'.");
+    $("crop").scrollIntoView({ behavior: "auto", block: "start" });
+  } catch {
+    setStatus("error", "이 사진을 열지 못했어요. JPG나 PNG 사진으로 다시 골라 주세요.", "Couldn't open this photo. Try a JPG or PNG.");
+  }
+}
+
+async function analyze() {
+  if (!state.img) return;
   if (!state.ready) {
-    state.pendingFile = file;   // 준비가 끝나면 바로 분석한다 — 사진을 넣었는데 반응이 없는 일이 없게
+    state.pending = true;   // 준비가 끝나면 바로 분석한다 — 버튼을 눌렀는데 반응이 없는 일이 없게
     setStatus("busy", "모델 준비가 끝나면 바로 분석할게요…", "Will analyze as soon as the models are ready…");
     return;
   }
   if (state.busy) return;
   state.busy = true;
+  $("analyze-btn").disabled = true;
   const run = ++state.run;
   const started = performance.now();
   $("skeleton").hidden = false;
   $("result").hidden = true;
   try {
     let t = performance.now();
-    const img = await loadImage(file);
-    $("preview").src = img.src;
-    $("preview-wrap").hidden = false;
     setStatus("busy", "분석하는 중…", "Analyzing…");
     await yieldToUi();
-    const input = toInput(img);
+    const input = toInputs(state.img, state.rect);
     logStage(run, "preprocess", t);
 
     t = performance.now();
     const outs = tf.tidy(() => {
       const [pca, artistProbs, capCtx, capH0] = state.heads.predict(state.backbone.execute(input));
-      return [pca.div(pca.norm("euclidean", -1, true)), artistProbs, capCtx, capH0];   // 임베딩은 단위 벡터로
+      const first = (x) => x.slice([0, 0], [1, -1]);
+      return [l2(first(pca)), artistProbs.mean(0, true), first(capCtx), first(capH0)];   // 작가 확률만 보기들의 평균
     });
     const [emb, probs, ctx, h0] = outs.map((x) => x.dataSync());   // 작은 결과라 동기로 (캡션 단계와 같은 이유)
     tf.dispose([...outs, input]);
@@ -211,8 +246,10 @@ async function analyze(file) {
     const words = generateCaption(ctx, h0);
     logStage(run, "caption", t);
 
-    showMatches(emb);
-    showArtists(probs);
+    const matchKind = showMatches(emb);
+    const scope = Logic.scopeVerdict(probs, state.meta.artist_scope, matchKind);
+    showScope(scope);
+    showArtists(probs, scope);
     showCaption(words);
     const now = new Date();
     const when = $("analyzed-at");
@@ -226,16 +263,71 @@ async function analyze(file) {
   } catch (e) {
     console.error(e);
     logStage(run, "total", started, false);
-    if (e.code === "DECODE") {
-      setStatus("error", "이 사진을 열지 못했어요. JPG나 PNG 사진으로 다시 골라 주세요.", "Couldn't open this photo. Try a JPG or PNG.");
-    } else {
-      setStatus("error", "분석하지 못했어요. 다른 사진으로 해 보거나 새로고침해 주세요.", "Analysis failed. Try another photo or reload.");
-    }
+    setStatus("error", "분석하지 못했어요. 다른 사진으로 해 보거나 새로고침해 주세요.", "Analysis failed. Try another photo or reload.");
   } finally {
     $("skeleton").hidden = true;
+    $("analyze-btn").disabled = false;
     state.busy = false;
   }
 }
+
+const l2 = (x) => x.div(x.norm("euclidean", -1, true));
+
+// ---------- 그림 영역 상자 (끌어서 옮기기·모서리로 크기 바꾸기·키보드 화살표) ----------
+function drawCropBox() {
+  const { x, y, w, h } = state.rect;
+  const box = $("crop-box");
+  box.style.left = `${x * 100}%`;
+  box.style.top = `${y * 100}%`;
+  box.style.width = `${w * 100}%`;
+  box.style.height = `${h * 100}%`;
+}
+
+function moveRect(r, handle, dx, dy) {
+  const MIN = 0.1;
+  let { x, y, w, h } = r;
+  if (handle === "move") {
+    x = clamp(x + dx, 0, 1 - w);
+    y = clamp(y + dy, 0, 1 - h);
+  } else {
+    if (handle.includes("w")) { const nx = clamp(x + dx, 0, x + w - MIN); w += x - nx; x = nx; }
+    if (handle.includes("e")) w = clamp(w + dx, MIN, 1 - x);
+    if (handle.includes("n")) { const ny = clamp(y + dy, 0, y + h - MIN); h += y - ny; y = ny; }
+    if (handle.includes("s")) h = clamp(h + dy, MIN, 1 - y);
+  }
+  return { x, y, w, h };
+}
+
+(function initCrop() {
+  const stage = $("crop-stage");
+  const box = $("crop-box");
+  box.tabIndex = 0;
+  box.setAttribute("aria-description", "화살표: 옮기기, Shift+화살표: 크기 · Arrows move, Shift+arrows resize");
+  let drag = null;
+  box.addEventListener("pointerdown", (e) => {
+    drag = { handle: e.target.dataset.h || "move", sx: e.clientX, sy: e.clientY, r: { ...state.rect } };
+    box.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  box.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = (e.clientX - drag.sx) / stage.clientWidth;
+    const dy = (e.clientY - drag.sy) / stage.clientHeight;
+    state.rect = moveRect(drag.r, drag.handle, dx, dy);
+    drawCropBox();
+  });
+  const end = () => { drag = null; };
+  box.addEventListener("pointerup", end);
+  box.addEventListener("pointercancel", end);
+  box.addEventListener("keydown", (e) => {
+    const step = 0.02;
+    const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    state.rect = moveRect(state.rect, e.shiftKey ? "se" : "move", d[0], d[1]);
+    drawCropBox();
+  });
+})();
 
 // ---------- 1. 미술관 소장품 대조 ----------
 function setVerdict(el, kind, ko, en) {
@@ -301,10 +393,26 @@ function showMatches(emb) {
     li.append(thumb, meta);
     return li;
   }));
+  return verdict;
+}
+
+// ---------- 학습 범위 밖 ("모름"을 먼저 말한다) ----------
+function showScope(scope) {
+  const el = $("scope-verdict");
+  el.hidden = !scope.outside;
+  if (!scope.outside) return;
+  const pct = Math.round(scope.maxProb * 100);
+  el.replaceChildren(document.createTextNode(
+    `학습 범위 밖의 그림으로 보입니다. 학습한 작가 15명 누구와도 뚜렷하게 닮지 않았고(최고 ${pct}%), 등록된 소장품과도 같은 작품이 없습니다. 아래 작가 확률은 참고만 하세요.`));
+  const en = document.createElement("span");
+  en.className = "en";
+  en.lang = "en";
+  en.textContent = `This painting seems outside what the model has learned: no clear match with the 15 artists (top ${pct}%) and no identical museum work. Treat the artist scores below as hints only.`;
+  el.append(en);
 }
 
 // ---------- 2. 화풍으로 본 작가 ----------
-function showArtists(probs) {
+function showArtists(probs, scope) {
   const { artists, artist_ko: ko } = state.meta;
   const claimed = $("claimed").value === "" ? null : Number($("claimed").value);
   const v = Logic.artistVerdict(probs, claimed);
@@ -313,7 +421,14 @@ function showArtists(probs) {
   const el = $("artist-verdict");
   const nameKo = (i) => ko[artists[i]];
   const pct = (p, d = 0) => `${(p * 100).toFixed(d)}%`;
-  if (v.kind === "none") {
+  $("artists").classList.toggle("unsure", scope.outside);
+  if (scope.outside && claimed !== null) {
+    setVerdict(el, "maybe", `학습 범위 밖의 그림이라 ${nameKo(claimed)} 화풍인지 판단하기 어렵습니다 (${pct(v.p, 1)}, ${v.rank}위). 전문가 감정을 권합니다.`,
+      `Outside the model's scope, so it can't judge whether this is ${artists[claimed]}'s style (${pct(v.p, 1)}, ranked ${v.rank}). Get a professional opinion.`);
+  } else if (scope.outside) {
+    setVerdict(el, "", `15명 중 가장 가까운 화풍은 ${nameKo(v.order[0])}이지만 확률이 낮아 의미가 크지 않습니다.`,
+      `The nearest of the 15 styles is ${artists[v.order[0]]}, but the score is too low to mean much.`);
+  } else if (v.kind === "none") {
     setVerdict(el, "", `학습한 작가 15명 중에서는 ${nameKo(v.order[0])}의 화풍에 가장 가깝습니다. 목록에 없는 작가의 그림이라도 15명 중 하나로 답하므로 참고만 하세요.`,
       `Closest style among the 15 artists: ${artists[v.order[0]]}. Paintings by other artists are still mapped to one of the 15 — use as a hint only.`);
   } else if (v.kind === "good") {
@@ -418,12 +533,11 @@ $("theme-toggle").addEventListener("click", () => {
 // ---------- 이벤트 ----------
 $("photo").addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
-  if (file) analyze(file);
+  if (file) choosePhoto(file);
 });
-$("claimed").addEventListener("change", () => {
-  const file = $("photo").files && $("photo").files[0];
-  if (file && !$("result").hidden) analyze(file);
-});
+$("analyze-btn").addEventListener("click", () => analyze());
+$("whole-btn").addEventListener("click", () => { state.rect = { x: 0, y: 0, w: 1, h: 1 }; drawCropBox(); analyze(); });
+$("claimed").addEventListener("change", () => { if (state.img && !$("result").hidden) analyze(); });
 $("retry").addEventListener("click", () => { $("retry").hidden = true; boot(); });
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

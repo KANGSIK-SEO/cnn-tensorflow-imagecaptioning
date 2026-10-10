@@ -8,6 +8,8 @@
     "<sep>": "|",
     유럽: "European", 미국: "American", 중국: "Chinese", 일본: "Japanese", 한국: "Korean", 인도: "Indian",
     페르시아: "Persian", 기타: "",
+    이탈리아: "Italian", 플랑드르: "Flemish", 네덜란드: "Dutch", 스페인: "Spanish", 프랑스: "French", 영국: "British",
+    독일어권: "German-speaking",
     유화: "oil painting", 템페라: "tempera painting", 과슈: "gouache painting", 수채: "watercolor",
     파스텔: "pastel", 수묵: "ink painting", 수묵채색: "ink-and-color painting", 프레스코: "fresco", 회화: "painting",
     강: "river", 개: "dog", 건물: "buildings", 과일: "fruit", 구름: "clouds", 군인: "soldiers", 꽃: "flowers",
@@ -78,6 +80,16 @@
     return { kind: "bad", order, rank, p };
   }
 
+  // ---------- 학습 범위 밖 ("모름") ----------
+  // scope.threshold는 학습 때 15명의 시험 그림과 15명 밖 그림을 가장 잘 가르는 최고 확률 값(meta.artist_scope).
+  // 소장품과 같거나 비슷한 작품을 찾았으면 범위 밖이라 하지 않는다 — 그 그림은 모델이 알고 있다.
+  function scopeVerdict(probs, scope, matchKind) {
+    const maxProb = Math.max(...probs);
+    const threshold = scope && typeof scope.threshold === "number" ? scope.threshold : 0.5;
+    const outside = maxProb < threshold && matchKind !== "same" && matchKind !== "similar";
+    return { outside, maxProb, threshold };
+  }
+
   // ---------- 입력 사진 확인 ----------
   const MAX_FILE_MB = 30;
   function checkFile(file) {
@@ -104,7 +116,7 @@
     return problems;
   }
 
-  const api = { captionSentence, objectParticle, matchVerdict, artistVerdict, checkFile, validateAssets, toEn, MAX_FILE_MB };
+  const api = { captionSentence, objectParticle, matchVerdict, artistVerdict, scopeVerdict, checkFile, validateAssets, toEn, MAX_FILE_MB };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Logic = api;
 })(typeof self !== "undefined" ? self : globalThis);

@@ -55,3 +55,17 @@ test("모델 점검: 맞지 않는 곳을 한 번에 모두 알린다", () => {
   assert.deepEqual(L.validateAssets({ meta, refs, refBytes: 2560, headsOutputs: [256, 15, 64, 256], decoderOutputs: [62, 256] }), []);
   assert.equal(L.validateAssets({ meta, refs, refBytes: 100, headsOutputs: [256, 14], decoderOutputs: [60] }).length, 3);
 });
+
+test("학습 범위 밖: 확률이 낮고 소장품에도 없으면 '모름'", () => {
+  const scope = { threshold: 0.6 };
+  assert.equal(L.scopeVerdict([0.538, 0.2, 0.262], scope, "none").outside, true);   // 브론치노 → 루벤스 53.8% 같은 경우
+  assert.equal(L.scopeVerdict([0.9, 0.05, 0.05], scope, "none").outside, false);
+  assert.equal(L.scopeVerdict([0.3, 0.3, 0.4], scope, "same").outside, false);       // 소장품과 같은 작품이면 아는 그림
+  assert.equal(L.scopeVerdict([0.3, 0.3, 0.4], undefined, "none").threshold, 0.5);   // 기준값이 없으면 0.5
+});
+
+test("캡션 단어장의 모든 단어에 영어가 있다 (한영 병기가 빠지지 않게)", () => {
+  const { vocab } = require("../public/models/meta.json");
+  const missing = vocab.filter((w) => !w.startsWith("<") && /[가-힣]/.test(L.toEn(w)));
+  assert.deepEqual(missing, []);
+});
