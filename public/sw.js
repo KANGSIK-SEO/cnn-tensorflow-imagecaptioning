@@ -3,7 +3,7 @@
 //   그 밖의 같은 사이트 파일(앱·모델 가중치·썸네일): 저장본 먼저 → 없으면 내려받아 저장
 // 처음 설치할 때 앱과 모델 파일 전부(models/files.json)를 미리 저장한다. 모델·앱을 바꾸면 CACHE 이름을 올린다
 // (app.js의 CACHE_NAME도 같이).
-const CACHE = "art-verify-v3";
+const CACHE = "art-verify-v4";
 const OFFLINE_URL = "offline.html";
 const SHELL = ["./", "index.html", OFFLINE_URL, "style.css", "theme-init.js", "logic.js", "app.js", "manifest.json",
   "icon.svg", "icon-192.png", "icon-512.png", "vendor/tf-shim.js", "vendor/tf.min.js", "models/files.json"];
