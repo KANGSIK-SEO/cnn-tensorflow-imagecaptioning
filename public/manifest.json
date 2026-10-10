@@ -1,13 +1,20 @@
 {
-  "name": "명화 진위 참고 검사",
-  "short_name": "진위검사",
-  "description": "CNN과 이미지 캡셔닝으로 그림 사진을 기기 안에서 분석합니다.",
+  "id": "/",
+  "name": "명화 진위 참고 검사 · Art Authenticity Check",
+  "short_name": "진위검사 ArtCheck",
+  "description": "CNN과 이미지 캡셔닝으로 그림 사진을 기기 안에서 분석합니다. On-device painting check with CNN and image captioning — works offline.",
   "lang": "ko",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f3ee",
-  "theme_color": "#1f2a44",
+  "orientation": "portrait-primary",
+  "categories": ["education", "utilities"],
+  "prefer_related_applications": false,
+  "background_color": "#f6f3ee",
+  "theme_color": "#f6f3ee",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

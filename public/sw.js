@@ -1,8 +1,12 @@
-// 인터넷 없이 쓰기: 처음 열 때 앱과 모델 파일 전부를 기기에 저장하고, 그다음부터는 저장본으로 돈다.
-// 모델 파일 목록은 학습 스크립트가 만드는 models/files.json에서 읽는다. 모델을 바꾸면 CACHE 이름을 올린다.
-const CACHE = "art-verify-v1";
-const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.json", "icon.svg", "vendor/tf.min.js",
-  "models/files.json"];
+// 인터넷 없이 쓰기 — 명화 추천 챗봇 PR #36의 나눔을 따른다.
+//   페이지(navigate): 네트워크 먼저 → 실패하면 저장본 → 그것도 없으면 offline.html
+//   그 밖의 같은 사이트 파일(앱·모델 가중치·썸네일): 저장본 먼저 → 없으면 내려받아 저장
+// 처음 설치할 때 앱과 모델 파일 전부(models/files.json)를 미리 저장한다. 모델·앱을 바꾸면 CACHE 이름을 올린다
+// (app.js의 CACHE_NAME도 같이).
+const CACHE = "art-verify-v2";
+const OFFLINE_URL = "offline.html";
+const SHELL = ["./", "index.html", OFFLINE_URL, "style.css", "theme-init.js", "logic.js", "app.js", "manifest.json",
+  "icon.svg", "icon-192.png", "icon-512.png", "vendor/tf-shim.js", "vendor/tf.min.js", "models/files.json"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
@@ -20,16 +24,34 @@ self.addEventListener("activate", (e) => {
     .then(() => self.clients.claim()));
 });
 
-// 저장본을 먼저 쓰고, 없으면 내려받아 저장한다 (썸네일은 볼 때 저장)
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET" || new URL(e.request.url).origin !== self.location.origin) return;
+  const { request } = e;
+  if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
+
+  if (request.mode === "navigate") {
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(request);
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(request, copy));
+        }
+        return res;
+      } catch {
+        return (await caches.match(request, { ignoreSearch: true })) || (await caches.match("index.html")) ||
+          (await caches.match(OFFLINE_URL));
+      }
+    })());
+    return;
+  }
+
   e.respondWith((async () => {
-    const hit = await caches.match(e.request, { ignoreSearch: true });
+    const hit = await caches.match(request, { ignoreSearch: true });
     if (hit) return hit;
-    const res = await fetch(e.request);
+    const res = await fetch(request);
     if (res.ok) {
       const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy));
+      caches.open(CACHE).then((c) => c.put(request, copy));
     }
     return res;
   })());

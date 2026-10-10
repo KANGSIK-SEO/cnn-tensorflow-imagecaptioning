@@ -3,69 +3,139 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>명화 진위 참고 검사</title>
-  <meta name="description" content="CNN과 이미지 캡셔닝으로 그림 사진을 스마트폰 안에서 분석합니다. API 키도 서버도 필요 없습니다.">
-  <meta name="theme-color" content="#1f2a44">
+  <title>명화 진위 참고 검사 · Art Authenticity Check</title>
+  <meta name="description" content="그림 사진을 폰 안에서 CNN·이미지 캡셔닝으로 분석합니다. API 키·서버·인터넷 불필요. On-device art check with CNN and image captioning — no API key, no server, works offline.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://cnn-tensorflow-imagecaptioning.vercel.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:site_name" content="명화 진위 참고 검사 · Art Authenticity Check">
+  <meta property="og:title" content="명화 진위 참고 검사 · Art Authenticity Check">
+  <meta property="og:description" content="CNN 화풍 판별·미술관 소장품 대조·이미지 캡셔닝을 폰 안에서. On-device CNN style check, museum matching and captioning — offline, no API key.">
+  <meta property="og:url" content="https://cnn-tensorflow-imagecaptioning.vercel.app/">
+  <meta property="og:image" content="https://cnn-tensorflow-imagecaptioning.vercel.app/icon-512.png">
+  <meta property="og:image:alt" content="액자 속 그림과 돋보기 아이콘 · Framed painting with a magnifier">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="명화 진위 참고 검사 · Art Authenticity Check">
+  <meta name="twitter:description" content="On-device CNN + image captioning for paintings. No API key, works offline.">
+  <meta name="twitter:image" content="https://cnn-tensorflow-imagecaptioning.vercel.app/icon-512.png">
+  <meta name="twitter:image:alt" content="Framed painting with a magnifier">
+  <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141311" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icon-180.png" sizes="180x180">
   <link rel="stylesheet" href="style.css">
+  <script src="theme-init.js"></script>
+  <script src="vendor/tf-shim.js" defer></script>
   <script src="vendor/tf.min.js" defer></script>
+  <script src="logic.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>명화 진위 참고 검사</h1>
-    <p class="sub">사진을 넣으면 <b>이 폰 안에서</b> CNN이 화풍과 미술관 소장품을 대조하고, 이미지 캡셔닝이 그림을 설명합니다.
-      사진은 어디로도 보내지 않습니다.</p>
+  <a class="skip-link" href="#main">본문으로 건너뛰기 · Skip to content</a>
+
+  <header role="banner" class="top">
+    <div class="brand">
+      <h1>명화 진위 참고 검사</h1>
+      <p class="en-title" lang="en">Art Authenticity Check</p>
+    </div>
+    <button id="theme-toggle" class="icon-btn" type="button" aria-label="밝은/어두운 화면 바꾸기 · Toggle light/dark theme">
+      <span class="theme-icon-light" aria-hidden="true">☀️</span><span class="theme-icon-dark" aria-hidden="true">🌙</span>
+    </button>
   </header>
 
-  <main>
-    <section class="card" id="input-card">
+  <main id="main" tabindex="-1">
+    <p class="lead">
+      사진을 넣으면 <b>이 폰 안에서</b> CNN이 화풍과 미술관 소장품을 대조하고, 이미지 캡셔닝이 그림을 설명합니다. 사진은 어디로도 보내지 않습니다.
+      <span class="en" lang="en">Pick a photo — a CNN checks the painting style and museum matches, and image captioning describes it, <b>entirely on this phone</b>. Your photo never leaves the device.</span>
+    </p>
+
+    <section class="card" aria-labelledby="input-title">
+      <h2 id="input-title" class="visually-hidden">사진 넣기 · Add a photo</h2>
+      <label class="claim" for="claimed">
+        판매자가 말한 작가 <small>(선택)</small>
+        <span class="en" lang="en">Artist claimed by the seller (optional)</span>
+      </label>
+      <select id="claimed" aria-describedby="claimed-help">
+        <option value="">모름 / 목록에 없음 · Unknown / not listed</option>
+      </select>
+      <p id="claimed-help" class="hint">학습한 작가 15명 중에서 고를 수 있어요. · 15 artists are supported.</p>
+
       <label class="pick" for="photo">
         <span class="pick-icon" aria-hidden="true">📷</span>
-        <span>그림 사진 찍기 · 고르기</span>
+        <span>그림 사진 찍기 · 고르기<span class="en" lang="en">Take or choose a photo</span></span>
       </label>
-      <input id="photo" type="file" accept="image/*" hidden>
-      <label class="claim">판매자가 말한 작가 (선택)
-        <select id="claimed"><option value="">모름 / 목록에 없음</option></select>
-      </label>
-      <div id="preview-wrap" hidden><img id="preview" alt="고른 그림"></div>
-      <p id="status" role="status" aria-live="polite">모델을 불러오는 중…</p>
+      <input id="photo" class="visually-hidden" type="file" accept="image/*" aria-label="그림 사진 고르기 · Choose a painting photo">
+      <p class="hint">그림이 화면에 꽉 차게, 정면에서, 반사광 없이 찍으면 더 정확해요. · Fill the frame, shoot straight on, avoid glare.</p>
+
+      <div id="preview-wrap" hidden><img id="preview" alt="고른 그림 · Selected painting"></div>
+
+      <div id="status" class="status info" role="status" aria-live="polite">
+        <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="status-text">
+          <span class="ko">모델을 불러오는 중…</span>
+          <span class="en" lang="en">Loading models…</span>
+        </span>
+      </div>
+      <div class="progress" id="progress" role="progressbar" aria-label="모델 내려받기 · Model download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span id="progress-fill"></span>
+      </div>
+      <button id="retry" class="btn" type="button" hidden>다시 시도 · Try again</button>
     </section>
 
-    <section class="card" id="result" hidden aria-live="polite">
-      <h2>1. 미술관 소장품 대조 <small>CNN 임베딩</small></h2>
+    <div id="skeleton" class="card skeleton" hidden aria-hidden="true">
+      <div class="skeleton-lines"><span></span><span></span><span></span></div>
+      <div class="skeleton-tiles"><span></span><span></span><span></span></div>
+    </div>
+
+    <section class="card" id="result" hidden aria-labelledby="result-title" aria-live="polite">
+      <h2 id="result-title" class="visually-hidden">분석 결과 · Results</h2>
+      <p class="muted when"><time id="analyzed-at"></time></p>
+
+      <h3>1. 미술관 소장품 대조 <small>CNN embedding</small><span class="en" lang="en">Museum collection match</span></h3>
       <p id="match-verdict" class="verdict"></p>
-      <ol id="matches" class="matches"></ol>
+      <ol id="matches" class="matches" aria-label="가장 비슷한 소장품 · Most similar museum works"></ol>
 
-      <h2>2. 화풍으로 본 작가 <small>CNN 분류</small></h2>
+      <h3>2. 화풍으로 본 작가 <small>CNN classifier</small><span class="en" lang="en">Artist by painting style</span></h3>
       <p id="artist-verdict" class="verdict"></p>
-      <ol id="artists" class="bars"></ol>
+      <ol id="artists" class="bars" aria-label="작가별 확률 · Probability by artist"></ol>
 
-      <h2>3. 그림 설명 <small>이미지 캡셔닝</small></h2>
+      <h3>3. 그림 설명 <small>Image captioning</small><span class="en" lang="en">Description</span></h3>
       <p id="caption" class="caption"></p>
+      <p id="caption-en" class="caption en" lang="en"></p>
       <p id="caption-tokens" class="muted"></p>
 
-      <p class="notice">이 결과는 <b>참고용</b>이며 감정서가 아닙니다. 그림을 실제로 사고팔 때는 전문 감정기관에 맡기세요.</p>
+      <p class="notice">
+        이 결과는 <b>참고용</b>이며 감정서가 아닙니다. 실제 거래에서는 전문 감정기관에 맡기세요.
+        <span class="en" lang="en">For <b>reference only</b> — not an appraisal. Consult a professional authenticator before buying or selling.</span>
+      </p>
     </section>
 
-    <section class="card muted-card">
-      <h2>어떻게 동작하나요</h2>
+    <section class="card soft" aria-labelledby="how-title">
+      <h2 id="how-title">어떻게 동작하나요 <span class="en" lang="en">How it works</span></h2>
       <ul>
         <li><b>CNN</b>: MobileNetV2(ImageNet 사전학습)를 전이학습해 작가 15명의 화풍을 구분하고, 그림의 특징 벡터로 미술관 소장품
-          <span id="ref-count">약 3,500</span>점과 비교합니다. 미술관에 있는 원작과 똑같은 그림이 "진품"으로 팔린다면, 그 원작 사진을 복제했을 가능성이 큽니다.</li>
-        <li><b>이미지 캡셔닝</b>: CNN 특징을 GRU 디코더에 넣어 시대·문화권·기법·주제를 한 단어씩 만들어 냅니다.</li>
-        <li><b>기기 안 추론</b>: TensorFlow.js로 이 폰 안에서 돌아갑니다. API 키·서버가 필요 없고, 처음 열 때 앱과 모델(약 12MB)을 폰에 저장해 두므로
-          그다음부터는 <b>인터넷 없이(비행기 모드에서도)</b> 됩니다. 홈 화면에 추가하면 앱처럼 쓸 수 있습니다.</li>
-        <li><b>학습 데이터</b>: 메트로폴리탄·시카고·클리블랜드 미술관의 퍼블릭 도메인(CC0) 그림.</li>
+          <span id="ref-count">3,505</span>점과 비교합니다.
+          <span class="en" lang="en">A transfer-learned MobileNetV2 tells 15 artists' styles apart and compares feature vectors with museum works.</span></li>
+        <li><b>이미지 캡셔닝 · Image captioning</b>: CNN 특징을 GRU 디코더에 넣어 시대·문화권·기법·주제를 한 단어씩 만듭니다.
+          <span class="en" lang="en">A GRU decoder generates era, culture, technique and subjects word by word.</span></li>
+        <li><b>기기 안 추론 · On-device</b>: TensorFlow.js로 폰 안에서 돌고, 처음 열 때 앱과 모델(약 14MB)을 저장해 그다음부터는 인터넷 없이 됩니다. 홈 화면에 추가하면 앱처럼 쓸 수 있어요.
+          <span class="en" lang="en">Runs in TensorFlow.js; the app and models (~14 MB) are saved on first visit, then it works offline. Add it to your home screen.</span></li>
+        <li><b>학습 데이터 · Data</b>: 메트로폴리탄·시카고·클리블랜드 미술관의 퍼블릭 도메인(CC0) 그림.
+          <span class="en" lang="en">Public-domain (CC0) paintings from The Met, Art Institute of Chicago and Cleveland Museum of Art.</span></li>
       </ul>
       <p id="metrics" class="muted"></p>
     </section>
   </main>
 
   <footer>
-    <a href="https://github.com/KANGSIK-SEO/cnn-tensorflow-imagecaptioning">소스 코드</a> ·
-    <span id="offline-state">오프라인 준비 중…</span>
+    <a href="https://github.com/KANGSIK-SEO/cnn-tensorflow-imagecaptioning">소스 코드 · Source</a> ·
+    <span id="offline-state" role="status" aria-live="polite">오프라인 준비 중… · Preparing offline…</span>
   </footer>
 </body>
 </html>
