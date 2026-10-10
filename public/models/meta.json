@@ -1,0 +1,257 @@
+{
+ "image_size": 224,
+ "feature_dim": 1280,
+ "emb_dim": 256,
+ "cap_units": 256,
+ "ctx_dim": 64,
+ "max_len": 9,
+ "backbone": "MobileNetV2 1.0 224 (ImageNet), 입력 0~1 RGB",
+ "artists": [
+  "Claude Monet",
+  "Vincent van Gogh",
+  "Paul Gauguin",
+  "Camille Pissarro",
+  "Edgar Degas",
+  "Gustave Courbet",
+  "Camille Corot",
+  "John Singer Sargent",
+  "Winslow Homer",
+  "George Inness",
+  "Gilbert Stuart",
+  "Peter Paul Rubens",
+  "Giovanni Battista Tiepolo",
+  "Francesco Guardi",
+  "Chen Hongshou"
+ ],
+ "artist_ko": {
+  "Claude Monet": "클로드 모네",
+  "Vincent van Gogh": "빈센트 반 고흐",
+  "Paul Gauguin": "폴 고갱",
+  "Camille Pissarro": "카미유 피사로",
+  "Edgar Degas": "에드가 드가",
+  "Gustave Courbet": "귀스타브 쿠르베",
+  "Camille Corot": "카미유 코로",
+  "John Singer Sargent": "존 싱어 사전트",
+  "Winslow Homer": "윈슬로 호머",
+  "George Inness": "조지 이네스",
+  "Gilbert Stuart": "길버트 스튜어트",
+  "Peter Paul Rubens": "페테르 파울 루벤스",
+  "Giovanni Battista Tiepolo": "조반니 바티스타 티에폴로",
+  "Francesco Guardi": "프란체스코 과르디",
+  "Chen Hongshou": "천훙서우(陳洪綬)"
+ },
+ "vocab": [
+  "<pad>",
+  "<start>",
+  "<end>",
+  "11세기",
+  "12세기",
+  "13세기",
+  "14세기",
+  "15세기",
+  "16세기",
+  "17세기",
+  "18세기",
+  "19세기",
+  "20세기",
+  "<sep>",
+  "강",
+  "개",
+  "건물",
+  "과슈",
+  "과일",
+  "구름",
+  "군인",
+  "기타",
+  "꽃",
+  "나무",
+  "남성",
+  "누드",
+  "동물",
+  "말",
+  "물",
+  "미국",
+  "배",
+  "불교",
+  "산",
+  "새",
+  "성모",
+  "성인",
+  "소",
+  "수묵",
+  "수묵채색",
+  "수채",
+  "실내",
+  "아이",
+  "여성",
+  "예수",
+  "유럽",
+  "유화",
+  "음악",
+  "인도",
+  "일본",
+  "정물",
+  "죽음",
+  "중국",
+  "천사",
+  "초상",
+  "템페라",
+  "파스텔",
+  "페르시아",
+  "풍경",
+  "프레스코",
+  "하늘",
+  "한국",
+  "회화"
+ ],
+ "metrics": {
+  "artist_top1": 0.617,
+  "artist_top3": 0.84,
+  "artist_test_images": 94,
+  "caption_exact": 0.117,
+  "caption_slot_accuracy": 0.72,
+  "train_images": 3505
+ },
+ "match_thresholds": {
+  "same_work_p10": 0.573,
+  "same_work_median": 0.802,
+  "different_work_p99": 0.93,
+  "different_work_median": 0.587
+ },
+ "caption_samples": [
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "정물"
+   ],
+   "gold": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "여성",
+    "물",
+    "나무"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "여성",
+    "아이",
+    "여성"
+   ],
+   "gold": [
+    "19세기",
+    "미국",
+    "유화",
+    "<sep>",
+    "여성",
+    "남성"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "풍경"
+   ],
+   "gold": [
+    "20세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "건물",
+    "풍경",
+    "물"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "풍경"
+   ],
+   "gold": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "풍경"
+   ]
+  },
+  {
+   "pred": [
+    "17세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "초상",
+    "여성"
+   ],
+   "gold": [
+    "17세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "초상",
+    "남성"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "미국",
+    "유화"
+   ],
+   "gold": [
+    "19세기",
+    "미국",
+    "유화"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "누드"
+   ],
+   "gold": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "누드"
+   ]
+  },
+  {
+   "pred": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "건물",
+    "배"
+   ],
+   "gold": [
+    "19세기",
+    "유럽",
+    "유화",
+    "<sep>",
+    "풍경"
+   ]
+  }
+ ]
+}

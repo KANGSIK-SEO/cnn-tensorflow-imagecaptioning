@@ -195,7 +195,7 @@ async function generateCaption(ctxArr, h0Arr) {
     tf.dispose([tokenT, logits, state]);
     state = next;
     if (token === END) break;
-    if (words.length && words[words.length - 1] === vocab[token]) continue;   // 같은 말 반복 막기
+    if (words.includes(vocab[token])) continue;   // 같은 말 반복 막기 (예: "풍경 구름 풍경")
     words.push(vocab[token]);
   }
   ctx.dispose();

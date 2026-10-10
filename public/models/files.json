@@ -1,0 +1,13 @@
+[
+ "models/backbone/group1-shard1of3.bin",
+ "models/backbone/group1-shard2of3.bin",
+ "models/backbone/group1-shard3of3.bin",
+ "models/backbone/model.json",
+ "models/decoder/model.json",
+ "models/decoder/weights.bin",
+ "models/heads/model.json",
+ "models/heads/weights.bin",
+ "models/meta.json",
+ "models/refs.bin",
+ "models/refs.json"
+]
