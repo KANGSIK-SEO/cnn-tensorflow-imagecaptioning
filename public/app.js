@@ -10,7 +10,7 @@
 const MODELS = "models";
 const LOAD_BUDGET_MS = 90_000;   // 모델 내려받기 전체 시간 예산 (느린 모바일 망 고려, 저장된 뒤에는 금방 끝난다)
 const FETCH_RETRIES = 1;         // 일시 장애(5xx·연결 끊김)만 한 번 더 — 시간 초과·4xx는 다시 해도 같다 (명화 추천 챗봇 PR #23)
-const CACHE_NAME = "art-verify-v4";
+const CACHE_NAME = "art-verify-v5";
 
 const $ = (id) => document.getElementById(id);
 const state = { meta: null, refs: null, refVecs: null, backbone: null, heads: null, decoder: null,

@@ -35,9 +35,25 @@
   <script src="vendor/tf.min.js" defer></script>
   <script src="logic.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="install.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문으로 건너뛰기 · Skip to content</a>
+
+  <div class="install-bar" id="install-bar">
+    <button id="install-btn" class="install-btn" type="button" aria-haspopup="dialog">
+      <span aria-hidden="true">📲</span>
+      <span>앱으로 설치하기<span class="en" lang="en">Install the app</span></span>
+    </button>
+  </div>
+
+  <dialog id="install-dialog" class="install-dialog" aria-labelledby="install-title">
+    <h2 id="install-title">앱으로 설치하기 <span class="en" lang="en">Install the app</span></h2>
+    <div id="install-body"></div>
+    <p class="hint">설치하면 홈 화면 아이콘으로 열리고, 인터넷 없이도 분석돼요. 사진은 폰 밖으로 나가지 않아요.
+      <span class="en" lang="en">Once installed it opens from your home screen and works offline. Photos never leave your phone.</span></p>
+    <form method="dialog"><button class="btn" type="submit">닫기 · Close</button></form>
+  </dialog>
 
   <header role="banner" class="top">
     <div class="brand">

@@ -69,3 +69,29 @@ test("캡션 단어장의 모든 단어에 영어가 있다 (한영 병기가 �
   const missing = vocab.filter((w) => !w.startsWith("<") && /[가-힣]/.test(L.toEn(w)));
   assert.deepEqual(missing, []);
 });
+
+test("설치 방법: 실제 폰 브라우저 정보로 기종을 알아본다", () => {
+  const P = (ua, o) => L.installPlatform(ua, o);
+  const androidChrome = "Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
+  assert.equal(P(androidChrome).kind, "android");
+  assert.equal(P(androidChrome).vendor, "chrome");
+  assert.equal(P("Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36").vendor, "samsung");
+  assert.equal(P("Mozilla/5.0 (Linux; Android 12; HarmonyOS; NOH-AN00; HMSCore 6.13.0.302) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.196 HuaweiBrowser/15.0.4.312 Mobile Safari/537.36").vendor, "huawei");
+  assert.equal(P("Mozilla/5.0 (Linux; U; Android 13; zh-cn; 2211133C Build/TKQ1.220905.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/109.0.5414.118 Mobile Safari/537.36 XiaoMi/MiuiBrowser/18.1.30").vendor, "xiaomi");
+  assert.equal(P("Mozilla/5.0 (Linux; U; Android 13; zh-CN; PHB110 Build/TP1A.220905.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/115.0.5790.168 Mobile Safari/537.36 HeyTapBrowser/40.8.32.1").vendor, "oppo");
+
+  const iphoneSafari = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  assert.deepEqual([P(iphoneSafari).kind, P(iphoneSafari).browser], ["ios", "safari"]);
+  assert.equal(P("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1").browser, "other");
+  const ipad = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+  assert.equal(P(ipad, { maxTouchPoints: 5 }).kind, "ios");   // iPadOS는 Mac처럼 보인다
+  assert.equal(P(ipad, { maxTouchPoints: 0 }).kind, "desktop");
+
+  const kakaoAndroid = "Mozilla/5.0 (Linux; Android 14; SM-S921N Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0.6668.81 Mobile Safari/537.36;KAKAOTALK 2410150";
+  assert.deepEqual([P(kakaoAndroid).kind, P(kakaoAndroid).opener], ["inapp", "kakao"]);
+  const instaIos = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0.0";
+  assert.deepEqual([P(instaIos).kind, P(instaIos).opener], ["inapp", "manual"]);
+  assert.equal(P("Mozilla/5.0 (Linux; Android 13; V2227A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/107.0.5304.141 Mobile Safari/537.36 Instagram 300.0").opener, "android-intent");
+  assert.equal(P("Mozilla/5.0 (Linux; Android 13; PGT-AN10; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/107.0 Mobile Safari/537.36 MMWEBID/1 MicroMessenger/8.0.47").kind, "wechat");
+  assert.equal(P("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36").kind, "desktop");
+});

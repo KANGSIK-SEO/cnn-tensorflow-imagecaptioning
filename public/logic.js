@@ -90,6 +90,38 @@
     return { outside, maxProb, threshold };
   }
 
+  // ---------- 설치 방법 고르기 (기종·브라우저별) ----------
+  // 브라우저 정보(User-Agent)로 "이 폰에서 홈 화면에 설치하는 방법"을 고른다. 판단이 틀려도 안내만 달라질 뿐이라
+  // 안전하다. 반환 kind:
+  //   ios        아이폰·아이패드 — 자동 설치 불가, 공유 → 홈 화면에 추가 안내
+  //   inapp      카카오톡·인스타그램 등 앱 안 브라우저 — 설치 불가, 바깥 브라우저로 열기 (opener: kakao | android-intent | manual)
+  //   wechat     위챗 — 오른쪽 위 ⋯ → 브라우저로 열기 안내
+  //   android    안드로이드 일반 — 자동 설치 창이 없으면 메뉴 → 홈 화면에 추가 (vendor로 메뉴 이름 안내)
+  //   desktop    컴퓨터
+  function installPlatform(ua, { maxTouchPoints = 0 } = {}) {
+    const s = String(ua || "");
+    const ios = /iPhone|iPad|iPod/i.test(s) || (/Macintosh/i.test(s) && maxTouchPoints > 1);   // iPadOS는 Mac처럼 보인다
+    const android = /Android/i.test(s);
+    if (/MicroMessenger/i.test(s)) return { kind: "wechat", ios, android };
+    let inapp = null;
+    if (/KAKAOTALK/i.test(s)) inapp = "kakao";
+    else if (/Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|BAND\//i.test(s)) inapp = "other";
+    else if (android && /; wv\)/.test(s)) inapp = "other";   // 안드로이드 앱 안 웹뷰
+    if (inapp) return { kind: "inapp", ios, android, opener: inapp === "kakao" ? "kakao" : android ? "android-intent" : "manual" };
+    if (ios) return { kind: "ios", ios, android, browser: /CriOS|FxiOS|EdgiOS/i.test(s) ? "other" : "safari" };
+    if (android) {
+      let vendor = "chrome";
+      if (/SamsungBrowser/i.test(s)) vendor = "samsung";
+      else if (/HuaweiBrowser|HONOR|HMSCore/i.test(s)) vendor = "huawei";
+      else if (/MiuiBrowser|XiaoMi/i.test(s)) vendor = "xiaomi";
+      else if (/HeyTapBrowser|OppoBrowser|OPPO/i.test(s)) vendor = "oppo";
+      else if (/VivoBrowser|vivo/i.test(s)) vendor = "vivo";
+      else if (/UCBrowser|QQBrowser|baidu/i.test(s)) vendor = "china-other";
+      return { kind: "android", ios, android, vendor };
+    }
+    return { kind: "desktop", ios, android };
+  }
+
   // ---------- 입력 사진 확인 ----------
   const MAX_FILE_MB = 30;
   function checkFile(file) {
@@ -116,7 +148,7 @@
     return problems;
   }
 
-  const api = { captionSentence, objectParticle, matchVerdict, artistVerdict, scopeVerdict, checkFile, validateAssets, toEn, MAX_FILE_MB };
+  const api = { captionSentence, objectParticle, matchVerdict, artistVerdict, scopeVerdict, installPlatform, checkFile, validateAssets, toEn, MAX_FILE_MB };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Logic = api;
 })(typeof self !== "undefined" ? self : globalThis);
